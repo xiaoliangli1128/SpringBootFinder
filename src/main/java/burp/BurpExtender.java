@@ -100,7 +100,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
                                 helpers.analyzeRequest(baseRequestResponse).getUrl(),
                                 new IHttpRequestResponse[]{callbacks.applyMarkers(baseRequestResponse, null, null)},
                                 "SpringBoot framework favicon found",
-                                "The website favicon  is  springboot \n #you can check SpringBoot Vuln",
+                                "The website favicon  is  springboot \n you can check SpringBoot Vuln",
                                 "High",
                                 "Firm"));
                         return issues;

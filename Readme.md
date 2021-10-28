@@ -3,13 +3,13 @@
 ![1](https://github-readme-stats.vercel.app/api?username=xiaoliangli1128&show_icons=true&theme=dracula)
 
 ## burp插件实现被动探测SpringBoot 框架 基于以下两点实现
-- 递归遍历 urlpath 替换成favicon 再次请求,判断响应body是不是绿色叶子图标
-- 如果404 页面有 "Whitelabel Error Page" 也会提示
+>- 递归遍历 urlpath 替换成favicon 再次请求,判断响应body是不是绿色叶子图标
+>- 如果404 页面有 "Whitelabel Error Page" 也会提示
 
 效果如下图所示
 ![img](images/img.png)
 
-缺点就是 同一个host 下如果请求了不通路径，都报错的话,会重复
+缺点就是 同一个host 下如果请求了不同的路径，都报错的话,会重复
 ***
 原理就是 递归遍历urlpath 分别替换成favicon.ico 进行请求，然后获取响应体body 在求 散列值和shodan和fofa的算法一样
 
