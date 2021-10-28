@@ -3,4 +3,6 @@
 /build/
 /build/classes/java/main/
 /.idea/**/*
-gradle
+/gradle/
+gradlew
+gradlew.bat
