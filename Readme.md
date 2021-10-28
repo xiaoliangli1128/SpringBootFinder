@@ -1,7 +1,8 @@
 # SpringFinder 
 ***
-## burp插件  递归遍历 urlpath 加favicon 图标 如果是绿色叶子图标则提示
-如果404 页面有 "Whitelabel Error Page" 也会提示
+## burp插件实现被动探测SpringBoot 框架 基于以下两点实现
+- 递归遍历 urlpath 替换成favicon 再次请求,判断响应body是不是绿色叶子图标
+- 如果404 页面有 "Whitelabel Error Page" 也会提示
 
 效果如下图所示
 ![img](images/img.png)
@@ -11,22 +12,30 @@
 原理就是 递归遍历urlpath 分别替换成favicon.ico 进行请求，然后获取响应体body 在求 散列值和shodan和fofa的算法一样
 
 ```java
-    oResBodyInfo = ores.substring(oresponse.getBodyOffset());
+        String OldReq = helpers.bytesToString(baseRequestResponse.getRequest());
+        String Rurl = helpers.analyzeRequest(baseRequestResponse).getUrl().getPath();
+        String[] strlist = Rurl.split("/");
+        if (strlist.length < 1) {
+            return null;
+        }
+        for (int i = strlist.length - 1; i > 0; i--) { // 反转 path 从后
+            if (!"".equals(strlist[i])) {
+                NewReq = OldReq.replace(strlist[i], "favicon.ico?");
+                IHttpRequestResponse checkRequestResponse = callbacks.makeHttpRequest(baseRequestResponse.getHttpService(), helpers.stringToBytes(NewReq));
+                //IResponseInfo oresponse可以获取body的getBodyOffset()
+                byte[] res = checkRequestResponse.getResponse();
+                oresponse = helpers.analyzeResponse(res); //
+                //IHttpRequestResponse 返回的byte[] response
+                ores = new String(res);
+                oResBodyInfo = ores.substring(oresponse.getBodyOffset());
                 byte[] destResponse;
                 destResponse = Arrays.copyOfRange(res, oresponse.getBodyOffset(), res.length);
                 if (destResponse != null) {
                     if (isSpringBoot(destResponse)) {
-                        issues.add(new CustomScanIssue(
-                                baseRequestResponse.getHttpService(),
-                                helpers.analyzeRequest(baseRequestResponse).getUrl(),
-                                new IHttpRequestResponse[]{callbacks.applyMarkers(baseRequestResponse, null, null)},
-                                "SpringBoot framework favicon found",
-                                "The website favicon  is  springboot \n #you can check SpringBoot Vuln",
-                                "High",
-                                "Firm"));
-                        return issues;
+                        issues.add();                        
                     }
                 }
+            }
 ```
 求图标 散列值
 ```java
