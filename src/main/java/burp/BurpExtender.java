@@ -77,6 +77,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
         /*获取URL*/
         String OldReq = helpers.bytesToString(baseRequestResponse.getRequest());
         String Rurl = helpers.analyzeRequest(baseRequestResponse).getUrl().getPath();
+        stdout.println("Rul"+Rurl);
         String[] strlist = Rurl.split("/");
         if (strlist.length < 1) {
             return null;
@@ -87,45 +88,51 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
                 IHttpRequestResponse checkRequestResponse = callbacks.makeHttpRequest(baseRequestResponse.getHttpService(), helpers.stringToBytes(NewReq));
                 //IResponseInfo oresponse可以获取body的getBodyOffset()
                 byte[] res = checkRequestResponse.getResponse();
-                oresponse = helpers.analyzeResponse(res); //
-                //IHttpRequestResponse 返回的byte[] response
-                ores = new String(res);
-                oResBodyInfo = ores.substring(oresponse.getBodyOffset());
-                byte[] destResponse;
-                destResponse = Arrays.copyOfRange(res, oresponse.getBodyOffset(), res.length);
-                if (destResponse != null) {
-                    if (isSpringBoot(destResponse)) {
-                        issues.add(new CustomScanIssue(
-                                baseRequestResponse.getHttpService(),
-                                helpers.analyzeRequest(baseRequestResponse).getUrl(),
-                                new IHttpRequestResponse[]{callbacks.applyMarkers(baseRequestResponse, null, null)},
-                                "SpringBoot framework favicon found",
-                                "The website favicon  is  springboot \n you can check SpringBoot Vuln",
-                                "High",
-                                "Firm"));
-                        return issues;
+                oresponse = helpers.analyzeResponse(res);
+                if (oresponse.getStatusCode() == 200) { //当200的时候说明 favicon存在，再去看hash值
+                    //IHttpRequestResponse 返回的byte[] response
+                    ores = new String(res);
+                    oResBodyInfo = ores.substring(oresponse.getBodyOffset());
+                    byte[] destResponse;
+                    destResponse = Arrays.copyOfRange(res, oresponse.getBodyOffset(), res.length);
+                    if (destResponse != null) {
+                        if (isSpringBoot(destResponse)) {
+                            issues.add(new CustomScanIssue(
+                                    baseRequestResponse.getHttpService(),
+                                    helpers.analyzeRequest(baseRequestResponse).getUrl(),
+                                    new IHttpRequestResponse[]{callbacks.applyMarkers(baseRequestResponse, null, null)},
+                                    "SpringBoot framework favicon found",
+                                    "The website favicon  is  springboot \n you can check SpringBoot Vuln",
+                                    "High",
+                                    "Firm"));
+                            return issues;
+                        }
                     }
+
                 }
+
             }
 
 
         }
+        if (helpers.analyzeResponse(baseRequestResponse.getResponse()).getStatusCode() == 404) { // 是404的页面再去匹配 页面是否有指纹
+            List<int[]> matches = getMatches(baseRequestResponse.getResponse(), GREP_STRING_SPRING_BOOT);
+            if (matches.size() > 0) {
+                // report the issue
 
-        List<int[]> matches = getMatches(baseRequestResponse.getResponse(), GREP_STRING_SPRING_BOOT);
-        if (matches.size() > 0) {
-            // report the issue
+                issues.add(new CustomScanIssue(
+                        baseRequestResponse.getHttpService(),
+                        helpers.analyzeRequest(baseRequestResponse).getUrl(),
+                        new IHttpRequestResponse[]{callbacks.applyMarkers(baseRequestResponse, null, matches)},
+                        "SpringBoot Error Page found",
+                        "The response contains the string: " + helpers.bytesToString(GREP_STRING_SPRING_BOOT),
+                        "High",
+                        "Firm"));
+                return issues;
+            } else return null;
+        }
 
-            issues.add(new CustomScanIssue(
-                    baseRequestResponse.getHttpService(),
-                    helpers.analyzeRequest(baseRequestResponse).getUrl(),
-                    new IHttpRequestResponse[]{callbacks.applyMarkers(baseRequestResponse, null, matches)},
-                    "SpringBoot Error Page found",
-                    "The response contains the string: " + helpers.bytesToString(GREP_STRING_SPRING_BOOT),
-                    "High",
-                    "Firm"));
-            return issues;
-        } else return null;
-
+        return null;
     }
 
 
