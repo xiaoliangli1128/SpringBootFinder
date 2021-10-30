@@ -39,8 +39,9 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
         // set our extension name
         callbacks.setExtensionName("SpringBootFinder");
         stdout = new PrintWriter(callbacks.getStdout(), true);
-        stdout.println("Author: Pyth0n");
-        stdout.println("Description: find website ico or 404 page is springboot ");
+        stdout.println("+++++ load success! ^_^ ");
+        stdout.println("+++++ Author: Pyth0n");
+        stdout.println("+++++ Description: find website ico or 404 page is springboot ");
         // register ourselves as a custom scanner check
         callbacks.registerScannerCheck(this);
 
@@ -63,40 +64,36 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
         return matches;
     }
 
-    // 判断响应包的图标是不是spring 如果是就加入到IScanIssue
-    private IScanIssue isSpringBoot(List<IHttpRequestResponse> listRequestResponse) {
-        if (listRequestResponse.size() > 0) {
-            for (IHttpRequestResponse newRequestResponse : listRequestResponse) {
-                byte[] res = newRequestResponse.getResponse();
-                oresponse = helpers.analyzeResponse(res);
-                stdout.println(oresponse.getHeaders().stream().collect(Collectors.toList()));
-                if (oresponse.getStatusCode()==200) { //当200的时候说明 favicon存在，再去看hash值
-                    //IHttpRequestResponse 返回的byte[] response
-                    ores = new String(res);
-                    oResBodyInfo = ores.substring(oresponse.getBodyOffset());
-                    byte[] destResponse;
-                    destResponse = Arrays.copyOfRange(res, oresponse.getBodyOffset(), res.length);
-                    if (destResponse != null) {
-                        String base64Str = Base64.getMimeEncoder().encodeToString(destResponse);
-                        int favicon = Hashing.murmur3_32().hashString(base64Str.replace("\r", "") + "\n", StandardCharsets.UTF_8).asInt();
-                        if (116323821 == favicon) {
-                            return (new CustomScanIssue(
-                                    newRequestResponse.getHttpService(),
-                                    helpers.analyzeRequest(newRequestResponse).getUrl(),
-                                    new IHttpRequestResponse[]{callbacks.applyMarkers(newRequestResponse, null, null)},
-                                    "SpringBoot framework favicon found",
-                                    "The website favicon  is  springboot \n you can check SpringBoot Vuln" + helpers.analyzeRequest(newRequestResponse).getUrl(),
-                                    "High",
-                                    "Firm"));
+    // 判断响应包的图标是不是spring 如果是就报告这个IScanIssue
+    private IScanIssue isSpringBoot(IHttpRequestResponse newRequestResponse) {
 
-                        }
-                    }
+        byte[] res = newRequestResponse.getResponse();
+        oresponse = helpers.analyzeResponse(res);
+        /*当返回包为200的时候 且存在Accept-Ranges: bytes或者Content-Type: image/x-icon favicon才大概率可能存在，再去看hash值*/
+        if (oresponse.getStatusCode() == 200 && (oresponse.getHeaders().contains("Accept-Ranges: bytes")
+                || oresponse.getHeaders().contains("Content-Type: image/x-icon"))) {
+            //IHttpRequestResponse 返回的byte[] response
+            ores = new String(res);
+            oResBodyInfo = ores.substring(oresponse.getBodyOffset());
+            byte[] destResponse;
+            destResponse = Arrays.copyOfRange(res, oresponse.getBodyOffset(), res.length);
+            String base64Str = Base64.getMimeEncoder().encodeToString(destResponse);
+            int favicon = Hashing.murmur3_32().hashString(base64Str.replace("\r", "") + "\n", StandardCharsets.UTF_8).asInt();
+            if (116323821 == favicon) {
+                return (new CustomScanIssue(
+                        newRequestResponse.getHttpService(),
+                        helpers.analyzeRequest(newRequestResponse).getUrl(),
+                        new IHttpRequestResponse[]{callbacks.applyMarkers(newRequestResponse, null, null)},
+                        "SpringBoot framework favicon found",
+                        "The website favicon  is  springboot \n you can check SpringBoot Vuln: " + helpers.analyzeRequest(newRequestResponse).getUrl(),
+                        "High",
+                        "Firm"));
 
-                } else
-                    return null;
             }
 
-        }
+        } else
+            return null;
+
 
         return null;
 
@@ -108,7 +105,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
         String path = helpers.analyzeRequest(baseRequestResponse).getUrl().getPath();
         String[] pathList = path.split("/");
         if (pathList.length > 1) {
-            List<String> uniquePath = Arrays.asList(pathList).stream().distinct().collect(Collectors.toList());
+            List<String> uniquePath = Arrays.stream(pathList).distinct().collect(Collectors.toList());
             ArrayList<Integer> indexInt = new ArrayList<>();
             for (int i = 0; i < uniquePath.size(); i++) {
                 int index = 0;
@@ -128,25 +125,22 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
 
     }
 
-    private List<IHttpRequestResponse> uniqueResponse(IHttpRequestResponse baseRequestResponse,List<String> urlPath) {
+    private List<IHttpRequestResponse> uniqueResponse(IHttpRequestResponse baseRequestResponse, List<String> urlPath) {
         /*获取URL*/
-        stdout.println("urlpath" + urlPath.stream().collect(Collectors.toList()));
         List<IHttpRequestResponse> newHttpRequest = new ArrayList<>();
-        if (urlPath != null) {
 
-            for (String url : urlPath) {
-                byte[] NewReq = new byte[0];
-                try {
-                    NewReq = helpers.buildHttpRequest(new URL(url));
-                } catch (MalformedURLException e) {
-                    e.printStackTrace();
-                }
-                IHttpRequestResponse checkRequestResponse = callbacks.makeHttpRequest(baseRequestResponse.getHttpService(), NewReq);
-                //IResponseInfo oresponse可以获取body的getBodyOffset()
-                newHttpRequest.add(checkRequestResponse);
+        for (String url : urlPath) {
+            byte[] NewReq = new byte[0];
+            try {
+                NewReq = helpers.buildHttpRequest(new URL(url));
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
             }
+            IHttpRequestResponse checkRequestResponse = callbacks.makeHttpRequest(baseRequestResponse.getHttpService(), NewReq);
+            //IResponseInfo oresponse可以获取body的getBodyOffset()
+            newHttpRequest.add(checkRequestResponse);
         }
-        return null;
+        return newHttpRequest;
     }
 
 
@@ -154,28 +148,32 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
     public List<IScanIssue> doPassiveScan(IHttpRequestResponse baseRequestResponse) {
         // look for matches of our passive check grep string
         List<IScanIssue> issues = new ArrayList<>(1);
-        List<String> urlPath = getUniquePathList(baseRequestResponse);
-        List<IHttpRequestResponse> uniqueResponse = uniqueResponse(baseRequestResponse,urlPath);
-        issues.add(isSpringBoot(uniqueResponse));
-        return issues;
-//        if (helpers.analyzeResponse(baseRequestResponse.getResponse()).getStatusCode() == 404) { // 是404的页面再去匹配 页面是否有指纹
-//            List<int[]> matches = getMatches(baseRequestResponse.getResponse(), GREP_STRING_SPRING_BOOT);
-//            if (matches.size() > 0) {
-//                // report the issue
-//
-//                issues.add(new CustomScanIssue(
-//                        baseRequestResponse.getHttpService(),
-//                        helpers.analyzeRequest(baseRequestResponse).getUrl(),
-//                        new IHttpRequestResponse[]{callbacks.applyMarkers(baseRequestResponse, null, matches)},
-//                        "SpringBoot Error Page found",
-//                        "The response contains the string: " + helpers.bytesToString(GREP_STRING_SPRING_BOOT),
-//                        "High",
-//                        "Firm"));
-//                return issues;
-//            } else return null;
-//        }
 
-//        return null;
+        List<String> urlPath = getUniquePathList(baseRequestResponse);
+        List<IHttpRequestResponse> uniqueResponse = uniqueResponse(baseRequestResponse, urlPath);
+        for (IHttpRequestResponse newRequestResponse : uniqueResponse) {
+            issues.add(isSpringBoot(newRequestResponse));
+        }
+
+        int statusCode=helpers.analyzeResponse(baseRequestResponse.getResponse()).getStatusCode();
+       // if (statusCode == 404 || statusCode==403) { // 是404的页面再去匹配 页面是否有指纹
+            List<int[]> matches = getMatches(baseRequestResponse.getResponse(), GREP_STRING_SPRING_BOOT);
+            if (matches.size() > 0) {
+                // report the issue
+                issues.add(new CustomScanIssue(
+                        baseRequestResponse.getHttpService(),
+                        helpers.analyzeRequest(baseRequestResponse).getUrl(),
+                        new IHttpRequestResponse[]{callbacks.applyMarkers(baseRequestResponse, null, matches)},
+                        "SpringBoot Error Page found",
+                        "The response contains the string: " + helpers.bytesToString(GREP_STRING_SPRING_BOOT),
+                        "High",
+                        "Firm"));
+
+            }
+       // }
+
+        return issues;
+
     }
 
 
@@ -195,9 +193,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
         // Since the issue name is sufficient to identify our issues as different,
         // if both issues have the same name, only report the existing issue
         // otherwise report both issues
-        System.out.println(existingIssue.getUrl().getHost() + "<---->" + newIssue.getUrl().getHost());
-        if (existingIssue.getUrl().getHost().equals(newIssue.getUrl().getHost()) && existingIssue.getIssueName().equals
-                (newIssue.getIssueName())) {
+
+        if ( existingIssue.getUrl().getHost().equals(newIssue.getUrl().getHost())||existingIssue.getIssueName().equals(newIssue.getIssueName())) {
             return -1;
         } else return 0;
     }
@@ -209,13 +206,13 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
 // class implementing IScanIssue to hold our custom scan issue details
 //
 class CustomScanIssue implements IScanIssue {
-    private IHttpService httpService;
-    private URL url;
-    private IHttpRequestResponse[] httpMessages;
-    private String name;
-    private String detail;
-    private String severity;
-    private String confidence;
+    private final IHttpService httpService;
+    private final URL url;
+    private final IHttpRequestResponse[] httpMessages;
+    private final String name;
+    private final String detail;
+    private final String severity;
+    private final String confidence;
 
 
     public CustomScanIssue(
