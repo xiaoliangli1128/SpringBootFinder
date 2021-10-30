@@ -130,15 +130,16 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
         List<IHttpRequestResponse> newHttpRequest = new ArrayList<>();
 
         for (String url : urlPath) {
-            byte[] NewReq = new byte[0];
+
             try {
-                NewReq = helpers.buildHttpRequest(new URL(url));
+                byte[]  NewReq = helpers.buildHttpRequest(new URL(url));
+                IHttpRequestResponse checkRequestResponse = callbacks.makeHttpRequest(baseRequestResponse.getHttpService(), NewReq);
+                newHttpRequest.add(checkRequestResponse);
             } catch (MalformedURLException e) {
                 e.printStackTrace();
             }
-            IHttpRequestResponse checkRequestResponse = callbacks.makeHttpRequest(baseRequestResponse.getHttpService(), NewReq);
-            //IResponseInfo oresponse可以获取body的getBodyOffset()
-            newHttpRequest.add(checkRequestResponse);
+
+
         }
         return newHttpRequest;
     }
