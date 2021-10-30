@@ -1,8 +1,6 @@
 package burp;
 
-
 import com.google.common.hash.Hashing;
-
 import java.io.PrintWriter;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -95,18 +93,16 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
                     oResBodyInfo = ores.substring(oresponse.getBodyOffset());
                     byte[] destResponse;
                     destResponse = Arrays.copyOfRange(res, oresponse.getBodyOffset(), res.length);
-                    if (destResponse != null) {
-                        if (isSpringBoot(destResponse)) {
-                            issues.add(new CustomScanIssue(
-                                    baseRequestResponse.getHttpService(),
-                                    helpers.analyzeRequest(baseRequestResponse).getUrl(),
-                                    new IHttpRequestResponse[]{callbacks.applyMarkers(baseRequestResponse, null, null)},
-                                    "SpringBoot framework favicon found",
-                                    "The website favicon  is  springboot \n you can check SpringBoot Vuln",
-                                    "High",
-                                    "Firm"));
-                            return issues;
-                        }
+                    if (isSpringBoot(destResponse)) {
+                        issues.add(new CustomScanIssue(
+                                baseRequestResponse.getHttpService(),
+                                helpers.analyzeRequest(baseRequestResponse).getUrl(),
+                                new IHttpRequestResponse[]{callbacks.applyMarkers(baseRequestResponse, null, null)},
+                                "SpringBoot framework favicon found",
+                                "The website favicon  is  springboot \n you can check SpringBoot Vuln",
+                                "High",
+                                "Firm"));
+                        return issues;
                     }
 
                 }
@@ -166,13 +162,13 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
 // class implementing IScanIssue to hold our custom scan issue details
 //
 class CustomScanIssue implements IScanIssue {
-    private IHttpService httpService;
-    private URL url;
-    private IHttpRequestResponse[] httpMessages;
-    private String name;
-    private String detail;
-    private String severity;
-    private String confidence;
+    private final IHttpService httpService;
+    private final URL url;
+    private final IHttpRequestResponse[] httpMessages;
+    private final String name;
+    private final String detail;
+    private final String severity;
+    private final String confidence;
 
 
     public CustomScanIssue(
@@ -220,13 +216,13 @@ class CustomScanIssue implements IScanIssue {
 
     @Override
     public String getIssueBackground() {
-        return String.format("  SpringBoot is a new open source lightweight framework developed by the Pivotal team since 2013 " +
+        return " SpringBoot is a new open source lightweight framework developed by the Pivotal team since 2013 " +
                 "and released in its first version in April 2014. It is based on Spring 4.0 and not only inherits " +
                 "the best features of the Spring framework, but also simplifies the whole process of building " +
                 "and developing Spring applications by simplifying configuration. In addition SpringBoot " +
                 "through the integration of a large number of frameworks makes the dependency package version " +
                 "conflict and reference instability and other issues are well resolved. try Access <ul><li>/env</li>" +
-                "<li>/actuator</li><ul>");
+                "<li>/actuator</li><ul>";
     }
 
     @Override
