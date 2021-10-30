@@ -155,8 +155,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
             issues.add(isSpringBoot(newRequestResponse));
         }
 
-        int statusCode=helpers.analyzeResponse(baseRequestResponse.getResponse()).getStatusCode();
-       // if (statusCode == 404 || statusCode==403) { // 是404的页面再去匹配 页面是否有指纹
+        int statusCode = helpers.analyzeResponse(baseRequestResponse.getResponse()).getStatusCode();
+        if (statusCode == 404 || statusCode == 403) { // 是404的页面再去匹配 页面是否有指纹
             List<int[]> matches = getMatches(baseRequestResponse.getResponse(), GREP_STRING_SPRING_BOOT);
             if (matches.size() > 0) {
                 // report the issue
@@ -170,7 +170,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
                         "Firm"));
 
             }
-       // }
+        }
 
         return issues;
 
@@ -194,7 +194,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
         // if both issues have the same name, only report the existing issue
         // otherwise report both issues
 
-        if ( existingIssue.getUrl().getHost().equals(newIssue.getUrl().getHost())||existingIssue.getIssueName().equals(newIssue.getIssueName())) {
+        if (existingIssue.getUrl().getHost().equals(newIssue.getUrl().getHost()) || existingIssue.getIssueName().equals(newIssue.getIssueName())) {
             return -1;
         } else return 0;
     }
