@@ -4,12 +4,14 @@ package burp;
 import com.google.common.hash.Hashing;
 
 import java.io.PrintWriter;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class BurpExtender implements IBurpExtender, IScannerCheck {
     private IBurpExtenderCallbacks callbacks;
@@ -19,7 +21,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
     private static final byte[] GREP_STRING_SPRING_BOOT = "Whitelabel Error Page".getBytes();
     private List<IParameter> parameters;
     IResponseInfo oresponse, response;
-    String ores, NewReq, oResBodyInfo;
+    String ores, oResBodyInfo;
     //
     // implement IBurpExtender
     //
@@ -61,78 +63,119 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
         return matches;
     }
 
-    // 判断响应包的图标是不是spring
-    public boolean isSpringBoot(byte[] destResponse) {
-        String base64Str = Base64.getMimeEncoder().encodeToString(destResponse);
-        int favicon = Hashing.murmur3_32().hashString(base64Str.replace("\r", "") + "\n", StandardCharsets.UTF_8).asInt();
-        if (116323821 == favicon) {
-            return true;
-        } else return false;
-    }
-
-    @Override
-    public List<IScanIssue> doPassiveScan(IHttpRequestResponse baseRequestResponse) {
-        // look for matches of our passive check grep string
-        List<IScanIssue> issues = new ArrayList<>(1);
-        /*获取URL*/
-        String OldReq = helpers.bytesToString(baseRequestResponse.getRequest());
-        String Rurl = helpers.analyzeRequest(baseRequestResponse).getUrl().getPath();
-        stdout.println("Rul"+Rurl);
-        String[] strlist = Rurl.split("/");
-        if (strlist.length < 1) {
-            return null;
-        }
-        for (int i = strlist.length - 1; i > 0; i--) { // 反转 path 从后
-            if (!"".equals(strlist[i])) {
-                NewReq = OldReq.replace(strlist[i], "favicon.ico?");
-                IHttpRequestResponse checkRequestResponse = callbacks.makeHttpRequest(baseRequestResponse.getHttpService(), helpers.stringToBytes(NewReq));
-                //IResponseInfo oresponse可以获取body的getBodyOffset()
-                byte[] res = checkRequestResponse.getResponse();
+    // 判断响应包的图标是不是spring 如果是就加入到IScanIssue
+    private IScanIssue isSpringBoot(List<IHttpRequestResponse> listRequestResponse) {
+        if (listRequestResponse.size() > 0) {
+            for (IHttpRequestResponse newRequestResponse : listRequestResponse) {
+                byte[] res = newRequestResponse.getResponse();
                 oresponse = helpers.analyzeResponse(res);
-                if (oresponse.getStatusCode() == 200) { //当200的时候说明 favicon存在，再去看hash值
+                stdout.println(oresponse.getHeaders().stream().collect(Collectors.toList()));
+                if (oresponse.getStatusCode()==200) { //当200的时候说明 favicon存在，再去看hash值
                     //IHttpRequestResponse 返回的byte[] response
                     ores = new String(res);
                     oResBodyInfo = ores.substring(oresponse.getBodyOffset());
                     byte[] destResponse;
                     destResponse = Arrays.copyOfRange(res, oresponse.getBodyOffset(), res.length);
                     if (destResponse != null) {
-                        if (isSpringBoot(destResponse)) {
-                            issues.add(new CustomScanIssue(
-                                    baseRequestResponse.getHttpService(),
-                                    helpers.analyzeRequest(baseRequestResponse).getUrl(),
-                                    new IHttpRequestResponse[]{callbacks.applyMarkers(baseRequestResponse, null, null)},
+                        String base64Str = Base64.getMimeEncoder().encodeToString(destResponse);
+                        int favicon = Hashing.murmur3_32().hashString(base64Str.replace("\r", "") + "\n", StandardCharsets.UTF_8).asInt();
+                        if (116323821 == favicon) {
+                            return (new CustomScanIssue(
+                                    newRequestResponse.getHttpService(),
+                                    helpers.analyzeRequest(newRequestResponse).getUrl(),
+                                    new IHttpRequestResponse[]{callbacks.applyMarkers(newRequestResponse, null, null)},
                                     "SpringBoot framework favicon found",
-                                    "The website favicon  is  springboot \n you can check SpringBoot Vuln",
+                                    "The website favicon  is  springboot \n you can check SpringBoot Vuln" + helpers.analyzeRequest(newRequestResponse).getUrl(),
                                     "High",
                                     "Firm"));
-                            return issues;
+
                         }
                     }
 
-                }
-
+                } else
+                    return null;
             }
 
-
-        }
-        if (helpers.analyzeResponse(baseRequestResponse.getResponse()).getStatusCode() == 404) { // 是404的页面再去匹配 页面是否有指纹
-            List<int[]> matches = getMatches(baseRequestResponse.getResponse(), GREP_STRING_SPRING_BOOT);
-            if (matches.size() > 0) {
-                // report the issue
-
-                issues.add(new CustomScanIssue(
-                        baseRequestResponse.getHttpService(),
-                        helpers.analyzeRequest(baseRequestResponse).getUrl(),
-                        new IHttpRequestResponse[]{callbacks.applyMarkers(baseRequestResponse, null, matches)},
-                        "SpringBoot Error Page found",
-                        "The response contains the string: " + helpers.bytesToString(GREP_STRING_SPRING_BOOT),
-                        "High",
-                        "Firm"));
-                return issues;
-            } else return null;
         }
 
         return null;
+
+    }
+
+    //根据path 递归遍历加入favicon图标
+    private List<String> getUniquePathList(IHttpRequestResponse baseRequestResponse) {
+        URL oldURL = this.helpers.analyzeRequest(baseRequestResponse).getUrl();
+        String path = helpers.analyzeRequest(baseRequestResponse).getUrl().getPath();
+        String[] pathList = path.split("/");
+        if (pathList.length > 1) {
+            List<String> uniquePath = Arrays.asList(pathList).stream().distinct().collect(Collectors.toList());
+            ArrayList<Integer> indexInt = new ArrayList<>();
+            for (int i = 0; i < uniquePath.size(); i++) {
+                int index = 0;
+                while ((index = path.indexOf(uniquePath.get(i), index)) > 0) {
+                    indexInt.add(index);
+                    index += uniquePath.get(i).length();
+                }
+
+            }
+            List<String> urlPath = new ArrayList();
+            ;
+            for (Integer i : indexInt) {
+                urlPath.add(oldURL.getProtocol() + "://" + oldURL.getAuthority() + path.substring(0, i) + "favicon.ico");
+            }
+            return urlPath;
+        } else return null;
+
+    }
+
+    private List<IHttpRequestResponse> uniqueResponse(IHttpRequestResponse baseRequestResponse,List<String> urlPath) {
+        /*获取URL*/
+        stdout.println("urlpath" + urlPath.stream().collect(Collectors.toList()));
+        List<IHttpRequestResponse> newHttpRequest = new ArrayList<>();
+        if (urlPath != null) {
+
+            for (String url : urlPath) {
+                byte[] NewReq = new byte[0];
+                try {
+                    NewReq = helpers.buildHttpRequest(new URL(url));
+                } catch (MalformedURLException e) {
+                    e.printStackTrace();
+                }
+                IHttpRequestResponse checkRequestResponse = callbacks.makeHttpRequest(baseRequestResponse.getHttpService(), NewReq);
+                //IResponseInfo oresponse可以获取body的getBodyOffset()
+                newHttpRequest.add(checkRequestResponse);
+            }
+        }
+        return null;
+    }
+
+
+    @Override
+    public List<IScanIssue> doPassiveScan(IHttpRequestResponse baseRequestResponse) {
+        // look for matches of our passive check grep string
+        List<IScanIssue> issues = new ArrayList<>(1);
+        List<String> urlPath = getUniquePathList(baseRequestResponse);
+        List<IHttpRequestResponse> uniqueResponse = uniqueResponse(baseRequestResponse,urlPath);
+        issues.add(isSpringBoot(uniqueResponse));
+        return issues;
+//        if (helpers.analyzeResponse(baseRequestResponse.getResponse()).getStatusCode() == 404) { // 是404的页面再去匹配 页面是否有指纹
+//            List<int[]> matches = getMatches(baseRequestResponse.getResponse(), GREP_STRING_SPRING_BOOT);
+//            if (matches.size() > 0) {
+//                // report the issue
+//
+//                issues.add(new CustomScanIssue(
+//                        baseRequestResponse.getHttpService(),
+//                        helpers.analyzeRequest(baseRequestResponse).getUrl(),
+//                        new IHttpRequestResponse[]{callbacks.applyMarkers(baseRequestResponse, null, matches)},
+//                        "SpringBoot Error Page found",
+//                        "The response contains the string: " + helpers.bytesToString(GREP_STRING_SPRING_BOOT),
+//                        "High",
+//                        "Firm"));
+//                return issues;
+//            } else return null;
+//        }
+
+//        return null;
     }
 
 
@@ -153,7 +196,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
         // if both issues have the same name, only report the existing issue
         // otherwise report both issues
         System.out.println(existingIssue.getUrl().getHost() + "<---->" + newIssue.getUrl().getHost());
-        if (existingIssue.getUrl().getHost().equals(newIssue.getUrl().getHost()) || existingIssue.getIssueName().equals
+        if (existingIssue.getUrl().getHost().equals(newIssue.getUrl().getHost()) && existingIssue.getIssueName().equals
                 (newIssue.getIssueName())) {
             return -1;
         } else return 0;
