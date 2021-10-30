@@ -175,7 +175,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
 
         return issues;
 
-        return null;
+
     }
 
 
@@ -268,7 +268,7 @@ class CustomScanIssue implements IScanIssue {
                 "and developing Spring applications by simplifying configuration. In addition SpringBoot " +
                 "through the integration of a large number of frameworks makes the dependency package version " +
                 "conflict and reference instability and other issues are well resolved. try Access <ul><li>/env</li>" +
-                "<li>/actuator</li><ul>");
+                "<li>/actuator</li><ul>";
     }
 
     @Override
