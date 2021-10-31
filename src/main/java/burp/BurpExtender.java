@@ -174,7 +174,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
             }
         }
 
-        return issues;
+        return issues.stream().distinct().collect(Collectors.toList());
 
 
     }
@@ -183,7 +183,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
     @Override
     public List<IScanIssue> doActiveScan(IHttpRequestResponse baseRequestResponse, IScannerInsertionPoint insertionPoint) {
 
-        return null;
+        return new ArrayList<>();
     }
 
     @Override
@@ -197,7 +197,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
         // if both issues have the same name, only report the existing issue
         // otherwise report both issues
 
-        if (existingIssue.getUrl().getHost().equals(newIssue.getUrl().getHost()) || existingIssue.getIssueName().equals(newIssue.getIssueName())) {
+        if (existingIssue.getUrl().getHost().equals(newIssue.getUrl().getHost()) || existingIssue.getIssueDetail()
+                .equals(newIssue.getIssueDetail())) {
             return -1;
         } else return 0;
     }
