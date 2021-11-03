@@ -157,7 +157,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
         }
 
         int statusCode = helpers.analyzeResponse(baseRequestResponse.getResponse()).getStatusCode();
-        if (statusCode == 404 || statusCode == 403) { // 是404的页面再去匹配 页面是否有指纹
+        if (statusCode == 404 || statusCode == 403 ||statusCode == 405) { // 是404的页面再去匹配 页面是否有指纹
             List<int[]> matches = getMatches(baseRequestResponse.getResponse(), GREP_STRING_SPRING_BOOT);
             if (matches.size() > 0) {
                 // report the issue
