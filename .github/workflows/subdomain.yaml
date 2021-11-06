@@ -1,0 +1,66 @@
+name: "SubFinder Action"
+description: "SubFinder is a passive subdomain discovery tool that discovers valid subdomains for websites."
+branding:
+  icon: "activity"
+  color: "blue"
+
+inputs:
+  domain:
+    description: "Domain to run subdomain enumeration"
+    required: true
+    default: ""
+
+  list:
+    description: "List of domains to run subdomain enumeration"
+    required: false
+    default: ""
+
+  config:
+    description: "Config file to use for subdomain enumeration"
+    required: false
+    default: ""
+
+  output:
+    description: "File to save output result"
+    required: false
+    default: "subfinder.log"
+
+  flags:
+    description: "Additional subfinder CLI flags to use"
+    required: false
+
+  active:
+    description: "Filter subdomains with no DNS records"
+    required: false
+    default: false
+
+  json:
+    description: "Format to save of output file"
+    required: false
+    default: false
+
+runs:
+  using: "composite"
+  steps:
+    - run: |
+        [ ! -x /home/runner/go/bin/subfinder ] && GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@v2.4.8
+        [ ! -z ${{ inputs.domain }} ] && echo "domain=-d ${{ inputs.domain}}" >> $GITHUB_ENV
+        [ ! -z ${{ inputs.list }} ] && echo "list=-dL ${{ inputs.list}}" >> $GITHUB_ENV
+        [ ! -z ${{ inputs.config }} ] && echo "config=-config ${{ inputs.config }}" >> $GITHUB_ENV
+        [ ! -z ${{ inputs.output }} ] && echo "output=-o ${{ inputs.output}}" >> $GITHUB_ENV || echo "output=-o subfinder.log" >> $GITHUB_ENV
+        [ ! -z "${{ inputs.flags }}" ] && echo "flags=${{ inputs.flags }}" >> $GITHUB_ENV
+        ${{ inputs.json }} && echo "json=-json" >> $GITHUB_ENV
+        ${{ inputs.active }} && echo "active=-nW" >> $GITHUB_ENV
+        echo "/home/runner/go/bin/" >> $GITHUB_PATH
+      shell: bash
+
+    - run: |
+        subfinder \
+          ${{ env.domain }} \
+          ${{ env.list }} \
+          ${{ env.config }} \
+          ${{ env.output }} \
+          ${{ env.json }} \
+          ${{ env.flags }} \
+          ${{ env.active }}
+      shell: bash
